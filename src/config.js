@@ -110,11 +110,11 @@ const CONFIG = {
   // Danh sách nguồn được bọc qua HLS proxy của addon ("*" = tất cả, "none" = không nguồn nào)
   proxyProviders: csv('PROXY_PROVIDERS', ['nguonc']),
   manifest: {
-    id: 'community.vietstream',
+    id: 'community.barostream',
     version: process.env.VERSION || '1.1.0',
-    name: 'VietStream · Phim Việt',
+    name: 'BaroStream · Phim Việt',
     description:
-      'Xem phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'
+      'BaroStream — nền tảng phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'
   }
 };
 
