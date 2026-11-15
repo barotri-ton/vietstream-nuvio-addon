@@ -28,7 +28,7 @@ const PROVIDERS = {
     cdnImage: process.env.OPHIM_CDN_IMAGE || 'https://img.ophim.live',
     siteUrl: process.env.OPHIM_SITE_URL || 'https://www.ophim.live',
     referer: 'https://www.ophim.live/',
-    enabled: ENABLED_LIST ? ENABLED_LIST.includes('ophim') : true,
+    enabled: false, // OPhim retired; do not re-enable through PROVIDERS env
     proxy: false
   },
   nguonc: {
@@ -114,7 +114,7 @@ const CONFIG = {
     version: process.env.VERSION || '1.1.0',
     name: 'VietStream · Phim Việt',
     description:
-      'Xem phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), OPhim, NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'
+      'Xem phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'
   }
 };
 
