@@ -26,7 +26,7 @@ function identity(m, type) {
   return title && year ? type + ':title:' + title + ':' + year : null;
 }
 function rank(id) {
-  const pid = String(id).split('_')[0];
+  const pid = ({ kk: 'kkphim', nc: 'nguonc', vn: 'vnstream', p4k: 'phim4k', tp: 'tophim', x20: 'xem20' })[String(id).split('_')[0]] || String(id).split('_')[0];
   return PRIORITY.indexOf(pid) < 0 ? 999 : PRIORITY.indexOf(pid);
 }
 function mergeCatalog(rows, type) {
