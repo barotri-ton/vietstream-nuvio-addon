@@ -208,9 +208,10 @@ router.get('/stream/:type/:id.json', async (req, res) => {
     console.warn('[stream] lỗi:', e.message);
   }
   // Samsung Tizen: direct HTTPS HLS streams must not carry browser-only
-  // proxyHeaders. Preserve K20's non-direct proxy fallback unchanged.
+  // proxyHeaders. Apply to K20 direct and its upstream proxy URLs;
+  // preserve the existing NguonC addon-side proxy and other providers.
   streams = dedupe(streams.map((s) => {
-    if ((s._providerId === 'kkphim' || (s._providerId === 'k20' && /[?&]mode=direct(?:&|$)/.test(s.url || ''))) && s.url && /^https:\/\//i.test(s.url)) {
+    if ((s._providerId === 'kkphim' || s._providerId === 'k20') && s.url && /^https:\/\//i.test(s.url)) {
       if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
     }
     return wrapProxy(s, base);
