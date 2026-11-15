@@ -125,7 +125,7 @@ router.get('/', (req, res) => {
     `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>VietStream Addon</title>
      <style>body{font-family:system-ui;background:#12141c;color:#eee;max-width:680px;margin:48px auto;padding:0 16px}
      a{color:#ffb347}code{background:#1e2230;padding:2px 6px;border-radius:6px}</style></head><body>
-     <h1>BaroStream · KKphim</h1>
+     <h1>BaroStream</h1>
      <p>Cài addon bằng manifest URL:</p>
      <p><code>${base}/manifest.json</code></p>
      <h3>Nguồn đang bật</h3><ul>${rows}</ul>
@@ -144,17 +144,21 @@ router.get('/stream/:type/:id.json', async (req, res) => {
     } else if (parsed?.imdbId) {
       const meta = await cinemeta.getMeta(type, parsed.imdbId);
       if (meta) {
-        streams = await providers.kkphim.resolveStream({
+        const request = {
           imdbId: parsed.imdbId, title: meta.name, year: meta.year,
           type, season: parsed.season, episode: parsed.episode
-        });
+        };
+        const results = await Promise.allSettled(
+          Object.values(providers).map(provider => provider.resolveStream(request))
+        );
+        streams = results.flatMap(result => result.status === 'fulfilled' ? result.value : []);
       }
     }
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);
   }
   streams = dedupe(streams.map(stream => {
-    if (stream.url && /^https:\/\//i.test(stream.url) && stream.behaviorHints) {
+    if (stream._providerId === 'kkphim' && stream.url && /^https:\/\//i.test(stream.url) && stream.behaviorHints) {
       delete stream.behaviorHints.proxyHeaders;
     }
     return stream;

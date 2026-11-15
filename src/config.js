@@ -55,7 +55,7 @@ const PROVIDERS = {
   },
   phim4k: {
     id: 'phim4k',
-    name: 'Phim4K',
+    name: 'VSMOV',
     prefix: 'p4k_',
     apiUrl: process.env.PHIM4K_API_URL || 'https://vsmov.com/api',
     siteUrl: process.env.PHIM4K_SITE_URL || 'https://vsmov.com',
@@ -111,7 +111,7 @@ const CONFIG = {
   proxyProviders: csv('PROXY_PROVIDERS', ['nguonc']),
   manifest: {
     id: 'community.barostream',
-    version: process.env.VERSION || '1.2.0',
+    version: process.env.VERSION || '1.2.1',
     name: 'BaroStream · Phim Việt',
     description:
       'BaroStream — nền tảng phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'

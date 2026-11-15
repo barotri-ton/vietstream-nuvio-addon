@@ -9,18 +9,22 @@ const CATALOG_DEFS = {
     { type: 'movie', id: 'kkphim-chieu-rap', name: 'Chiếu rạp' },
     { type: 'series', id: 'kkphim-phim-bo', name: 'Phim bộ', search: true },
     { type: 'series', id: 'kkphim-hoat-hinh', name: 'Hoạt hình' }
+  ],
+  phim4k: [
+    { type: 'movie', id: 'phim4k-phim-le', name: 'VSMOV · Phim lẻ', search: true },
+    { type: 'series', id: 'phim4k-phim-bo', name: 'VSMOV · Phim bộ', search: true }
   ]
 };
 
 function enabledProviders() {
-  return [PROVIDERS.kkphim];
+  return [PROVIDERS.kkphim, PROVIDERS.phim4k];
 }
 
 function buildManifest(baseUrl) {
-  const catalogs = CATALOG_DEFS.kkphim.map(({ type, id, name, search }) => ({
+  const catalogs = Object.values(CATALOG_DEFS).flat().map(({ type, id, name, search }) => ({
     type, id, name,
     extra: [
-      { name: 'genre', options: Object.keys(GENRE_MAP) },
+      ...(id.startsWith('kkphim-') ? [{ name: 'genre', options: Object.keys(GENRE_MAP) }] : []),
       { name: 'skip' },
       ...(search ? [{ name: 'search' }] : [])
     ]
@@ -29,11 +33,11 @@ function buildManifest(baseUrl) {
     id: CONFIG.manifest.id,
     version: CONFIG.manifest.version,
     name: CONFIG.manifest.name,
-    description: 'BaroStream · KKphim. Phim lẻ, phim bộ, chiếu rạp và hoạt hình.',
+    description: 'BaroStream · KKphim và VSMOV (thử nghiệm).',
     logo: `${baseUrl}/logo.svg`,
     resources: ['catalog', 'stream', 'meta'],
     types: ['movie', 'series'],
-    idPrefixes: ['tt', 'kk_'],
+    idPrefixes: ['tt', ...enabledProviders().map(provider => provider.prefix)],
     catalogs,
     behaviorHints: { configurable: false, configurationRequired: false }
   };
