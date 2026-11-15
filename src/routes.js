@@ -8,6 +8,7 @@ const cinemeta = require('./cinemeta');
 const { cached, getJson } = require('./utils');
 const { router: hlsRouter, getBaseUrl, b64e } = require('./hls-proxy');
 const { buildManifest, enabledProviders } = require('./manifest');
+const unified = require('./unified-catalog');
 
 // ---------- Khởi tạo provider ----------
 const CTORS = {
@@ -160,6 +161,28 @@ router.get('/stream/:type/:id.json', async (req, res) => {
     if (parsed && parsed.provider) {
       // ID có prefix nguồn (kk_..., nc_...) -> lấy trực tiếp, không cần Cinemeta
       streams = await parsed.provider.streamsFromSlug(parsed.slug, type, parsed.season, parsed.episode);
+      // Unified catalog maps equivalent provider IDs to one visible title.
+      // On a cold serverless instance the registry may be empty; resolve by
+      // primary metadata instead of depending solely on in-memory state.
+      const mapped = unified.mappedIds(req.params.id.split(':')[0]);
+      const others = mapped.filter(id => id !== req.params.id.split(':')[0]);
+      if (others.length) {
+        const more = await Promise.allSettled(others.map(id => {
+          const match = parseId(id);
+          return match?.provider ? match.provider.streamsFromSlug(match.slug, type, parsed.season, parsed.episode) : [];
+        }));
+        for (const result of more) if (result.status === 'fulfilled') streams.push(...result.value);
+      } else {
+        try {
+          const d = await parsed.provider.detail(parsed.slug);
+          if (d && d.name) {
+            const more = await Promise.allSettled(Object.values(providers)
+              .filter(p => p.id !== parsed.provider.id)
+              .map(p => p.resolveStream({ title: d.originalName || d.name, year: d.year, type, season: parsed.season, episode: parsed.episode })));
+            for (const result of more) if (result.status === 'fulfilled' && Array.isArray(result.value)) streams.push(...result.value);
+          }
+        } catch (e) { console.warn('[unified:stream]', e.message); }
+      }
     } else if (parsed) {
       // IMDb ID -> tra tên phim từ Cinemeta rồi hỏi từng nguồn
       const meta = await cinemeta.getMeta(type, parsed.imdbId);
@@ -213,6 +236,13 @@ router.get('/catalog/:type/:id/:extra', (req, res) => {
 async function catalogSend(req, res) {
   const type = req.params.type === 'series' ? 'series' : 'movie';
   const catalogId = String(req._catalogId || '').replace(/\.json$/i, '');
+  if (unified.UNIFIED.some(d => d.id === catalogId && d.type === type)) {
+    try {
+      const metas = await cached(`unified:${catalogId}:${type}:${JSON.stringify(req._extra || {})}`, 5 * 60 * 1000,
+        () => unified.listUnified(catalogId, type, providers, req._extra || {}));
+      return res.json({ metas, cacheMaxAge: 300 });
+    } catch (e) { console.warn('[unified:catalog]', e.message); return res.json({ metas: [] }); }
+  }
   const dash = catalogId.indexOf('-');
   const providerId = dash > 0 ? catalogId.slice(0, dash) : catalogId;
   const kind = dash > 0 ? catalogId.slice(dash + 1) : '';

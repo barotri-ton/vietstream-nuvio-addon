@@ -38,8 +38,8 @@ function enabledProviders() {
 function buildManifest(baseUrl) {
   const on = enabledProviders();
 
-  const catalogs = [];
-  for (const p of on) {
+  const catalogs = require('./unified-catalog').UNIFIED.map(({ id, type, name }) => ({ id, type, name, extra: [{ name: 'search' }, { name: 'skip' }] }));
+  if (process.env.LEGACY_CATALOGS === 'true') for (const p of on) {
     for (const def of CATALOG_DEFS[p.id] || []) {
       const extra = [{ name: 'search' }, { name: 'skip' }];
       if (def.genres) extra.unshift({ name: 'genre', options: Object.keys(GENRE_MAP) });
