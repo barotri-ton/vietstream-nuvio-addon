@@ -17,7 +17,7 @@ test('Vercel exposes Stremio manifest without opening media proxy', async (t) =>
   const response = await fetch(origin + '/manifest.json');
   assert.equal(response.status, 200);
   const manifest = await response.json();
-  assert.equal(manifest.id, 'community.vietstream');
+  assert.equal(manifest.id, 'community.barostream');
   assert.ok(Array.isArray(manifest.resources));
   assert.ok(Array.isArray(manifest.types));
   assert.ok(Array.isArray(manifest.catalogs));
