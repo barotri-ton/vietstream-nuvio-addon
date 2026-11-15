@@ -184,7 +184,15 @@ router.get('/stream/:type/:id.json', async (req, res) => {
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);
   }
-  streams = dedupe(streams.map((s) => wrapProxy(s, base)));
+  // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
+  // directly in Safari without injected headers. Keep this change isolated
+  // to KKphim on this preview branch; all other providers are untouched.
+  streams = dedupe(streams.map((s) => {
+    if (s._providerId === 'kkphim' && s.url && /^https:\/\//i.test(s.url)) {
+      if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
+    }
+    return wrapProxy(s, base);
+  }));
   res.json({ streams, cacheMaxAge: 600 });
 });
 
