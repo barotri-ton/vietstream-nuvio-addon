@@ -41,7 +41,6 @@ function enabledProviders() {
 
 function buildManifest(baseUrl) {
   const on = enabledProviders();
-  const prefixes = on.map((p) => p.prefix);
 
   const catalogs = [];
   for (const p of on) {
@@ -59,15 +58,12 @@ function buildManifest(baseUrl) {
     name: CONFIG.manifest.name,
     description: `${CONFIG.manifest.description}\nNguồn: ${names}`,
     logo: `${baseUrl}/logo.svg`,
-    resources: [
-      { name: 'catalog', types: ['movie', 'series'], idPrefixes: on.map((p) => `${p.id}-`) },
-      { name: 'meta', types: ['movie', 'series'], idPrefixes: prefixes },
-      { name: 'stream', types: ['movie', 'series'], idPrefixes: ['tt', ...prefixes] }
-    ],
+    // VNStream-compatible generic resource declarations. Let Stremio request
+    // metadata/streams for both IMDb IDs and provider-specific catalog IDs.
+    resources: ['catalog', 'stream', 'meta'],
     types: ['movie', 'series'],
     catalogs,
-    idPrefixes: ['tt', ...prefixes],
-    behaviorHints: { configurable: false }
+    behaviorHints: { configurable: false, configurationRequired: false }
   };
 }
 
