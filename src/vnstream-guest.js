@@ -1,6 +1,6 @@
 'use strict';
 // Remote Stremio addon adapter. No scraping or undocumented API required.
-const BASE = (process.env.VNSTREAM_GUEST_URL || 'https://addon.vnstream.io.vn/guest').replace(/\\/+$/, '');
+const BASE = (process.env.VNSTREAM_GUEST_URL || 'https://addon.vnstream.io.vn/guest').replace(/\/+$/, '');
 const timeout = Number(process.env.VNSTREAM_GUEST_TIMEOUT || 6500);
 async function request(path) {
   const ctl = new AbortController();
@@ -27,7 +27,7 @@ async function catalog(type, kind, extra = {}) {
   return (data?.metas || []).filter(m => m?.id && (m.type === type || !m.type)).map(m => ({
     ...m, id: 'vng_' + m.id, type,
     // Avoid false title/year deduplication when upstream metadata is incomplete.
-    year: m.year || Number(String(m.releaseInfo || '').match(/\\b(?:19|20)\\d{2}\\b/)?.[0]) || undefined
+    year: m.year || Number(String(m.releaseInfo || '').match(/\b(?:19|20)\d{2}\b/)?.[0]) || undefined
   }));
 }
 async function streams(type, id) {
