@@ -207,11 +207,11 @@ router.get('/stream/:type/:id.json', async (req, res) => {
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);
   }
-  // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
-  // directly in Safari without injected headers. Keep this change isolated
-  // to KKphim on this preview branch; all other providers are untouched.
+  // Samsung Tizen: direct HTTPS HLS streams must not carry browser-only
+  // proxyHeaders. Apply to K20 direct and its upstream proxy URLs;
+  // preserve the existing NguonC addon-side proxy and other providers.
   streams = dedupe(streams.map((s) => {
-    if (s._providerId === 'kkphim' && s.url && /^https:\/\//i.test(s.url)) {
+    if ((s._providerId === 'kkphim' || s._providerId === 'k20') && s.url && /^https:\/\//i.test(s.url)) {
       if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
     }
     return wrapProxy(s, base);
