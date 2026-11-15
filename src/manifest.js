@@ -11,10 +11,6 @@ const CATALOG_DEFS = {
     { type: 'series', id: 'kkphim-phim-bo', name: 'Phim bộ (KKphim)', genres: true },
     { type: 'series', id: 'kkphim-hoat-hinh', name: 'Hoạt hình (KKphim)', genres: true }
   ],
-  ophim: [
-    { type: 'movie', id: 'ophim-phim-le', name: 'Phim lẻ (OPhim)' },
-    { type: 'series', id: 'ophim-phim-bo', name: 'Phim bộ (OPhim)' }
-  ],
   nguonc: [
     { type: 'movie', id: 'nguonc-phim-le', name: 'Phim lẻ (NguonC)' },
     { type: 'series', id: 'nguonc-phim-bo', name: 'Phim bộ (NguonC)' }
