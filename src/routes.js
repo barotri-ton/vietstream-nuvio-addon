@@ -3,13 +3,12 @@
 const express = require('express');
 const path = require('node:path');
 const fs = require('node:fs');
-const { CONFIG, PROVIDERS } = require('./config');
+const { CONFIG } = require('./config');
 const cinemeta = require('./cinemeta');
 const { cached, getJson } = require('./utils');
-const { router: hlsRouter, getBaseUrl, b64e } = require('./hls-proxy');
+const { router: hlsRouter, getBaseUrl } = require('./hls-proxy');
 const { buildManifest, enabledProviders } = require('./manifest');
 const unified = require('./unified-catalog');
-const guest = require('./vnstream-guest');
 
 // ---------- Khởi tạo provider ----------
 const CTORS = {
@@ -69,23 +68,6 @@ function parseExtra(str) {
   return extra;
 }
 
-function shouldProxy(providerId) {
-  const cfg = PROVIDERS[providerId];
-  if (!cfg || !cfg.proxy) return false;
-  const list = CONFIG.proxyProviders;
-  if (list.includes('none')) return false;
-  return list.includes('*') || list.includes(providerId);
-}
-
-function wrapProxy(stream, baseUrl) {
-  const pid = stream._providerId;
-  if (stream.url && shouldProxy(pid)) {
-    const h = (stream.behaviorHints && stream.behaviorHints.proxyHeaders && stream.behaviorHints.proxyHeaders.request) || {};
-    stream.url = `${baseUrl}/hls/manifest.m3u8?url=${b64e(stream.url)}&ref=${b64e(h.Referer || '')}&origin=${b64e(h.Origin || '')}`;
-  }
-  return stream;
-}
-
 function dedupe(streams) {
   const seen = new Set();
   return streams.filter((s) => {
@@ -93,32 +75,6 @@ function dedupe(streams) {
     if (!k || seen.has(k)) return false;
     seen.add(k);
     return true;
-  });
-}
-
-function replaceStreamCEmbeds(streams) {
-  const proxies = new Map();
-  for (const stream of streams) {
-    if (stream._providerId !== 'k20' || !stream.url) continue;
-    try {
-      const url = new URL(stream.url);
-      if (url.pathname !== '/nguonc-hls.m3u8' || url.searchParams.has('mode')) continue;
-      const host = url.searchParams.get('eh');
-      const hash = url.searchParams.get('hash');
-      if (host && hash) proxies.set(`${host}:${hash}`, stream);
-    } catch { /* Ignore malformed stream URLs. */ }
-  }
-  return streams.filter(stream => {
-    if (stream._providerId !== 'nguonc' || !stream.externalUrl) return true;
-    try {
-      const embed = new URL(stream.externalUrl);
-      if (embed.pathname !== '/embed.php') return true;
-      const proxy = proxies.get(`${embed.host}:${embed.searchParams.get('hash')}`);
-      if (!proxy) return true;
-      proxy.name = 'NguonC · K20 Proxy' + stream.name.slice(stream.name.indexOf('\n'));
-      proxy.title = stream.title.replace(/ • Mở bằng trình duyệt$/, '');
-      return false;
-    } catch { return true; }
   });
 }
 
@@ -163,17 +119,16 @@ router.use('/nuvio-plugin', express.static(PLUGIN_DIR));
 router.get('/', (req, res) => {
   const base = getBaseUrl(req);
   const rows = Object.values(providers)
-    .map((p) => `<li><b>${p.name}</b> <code>${p.cfg.apiUrl}</code>${shouldProxy(p.id) ? ' (qua proxy)' : ''}</li>`)
+    .map((p) => `<li><b>${p.name}</b> <code>${p.cfg.apiUrl}</code></li>`)
     .join('');
   res.type('html').send(
     `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>VietStream Addon</title>
      <style>body{font-family:system-ui;background:#12141c;color:#eee;max-width:680px;margin:48px auto;padding:0 16px}
      a{color:#ffb347}code{background:#1e2230;padding:2px 6px;border-radius:6px}</style></head><body>
-     <h1>🎬 VietStream — Addon phim Việt cho Nuvio / Stremio</h1>
+     <h1>BaroStream · KKphim</h1>
      <p>Cài addon bằng manifest URL:</p>
      <p><code>${base}/manifest.json</code></p>
      <h3>Nguồn đang bật</h3><ul>${rows}</ul>
-     <p>Nguồn khác (đã tắt hoặc chết sẽ tự bỏ qua, không ảnh hưởng addon).</p>
      </body></html>`
   );
 });
@@ -182,77 +137,27 @@ router.get('/', (req, res) => {
 router.get('/stream/:type/:id.json', async (req, res) => {
   const type = req.params.type === 'series' ? 'series' : 'movie';
   const parsed = parseId(req.params.id);
-  const base = getBaseUrl(req);
   let streams = [];
   try {
-    if (guest.isRemoteId(req.params.id)) {
-      streams = await guest.streams(type, guest.unprefix(req.params.id));
-    } else if (parsed && parsed.provider) {
-      // ID có prefix nguồn (kk_..., nc_...) -> lấy trực tiếp, không cần Cinemeta
+    if (parsed?.provider) {
       streams = await parsed.provider.streamsFromSlug(parsed.slug, type, parsed.season, parsed.episode);
-      const guestStreams = parsed.provider.detail(parsed.slug).then(d => d ? guest.resolveStreams({
-        type, titles: [d.originalName, d.name], year: d.year,
-        season: parsed.season, episode: parsed.episode
-      }) : []).catch(() => []);
-      // Unified catalog maps equivalent provider IDs to one visible title.
-      // On a cold serverless instance the registry may be empty; resolve by
-      // primary metadata instead of depending solely on in-memory state.
-      const mapped = unified.mappedIds(req.params.id.split(':')[0]);
-      const others = mapped.filter(id => id !== req.params.id.split(':')[0]);
-      if (others.length) {
-        const more = await Promise.allSettled(others.map(id => {
-          const match = parseId(id);
-          return match?.provider ? match.provider.streamsFromSlug(match.slug, type, parsed.season, parsed.episode) : [];
-        }));
-        for (const result of more) if (result.status === 'fulfilled') streams.push(...result.value);
-      } else {
-        try {
-          const d = await parsed.provider.detail(parsed.slug);
-          if (d && d.name) {
-            const more = await Promise.allSettled(Object.values(providers)
-              .filter(p => p.id !== parsed.provider.id)
-              .map(p => p.resolveStream({ title: d.originalName || d.name, year: d.year, type, season: parsed.season, episode: parsed.episode })));
-            for (const result of more) if (result.status === 'fulfilled' && Array.isArray(result.value)) streams.push(...result.value);
-          }
-        } catch (e) { console.warn('[unified:stream]', e.message); }
-      }
-      streams.push(...await guestStreams);
-    } else if (parsed) {
-      // IMDb ID -> tra tên phim từ Cinemeta rồi hỏi từng nguồn
+    } else if (parsed?.imdbId) {
       const meta = await cinemeta.getMeta(type, parsed.imdbId);
       if (meta) {
-        const results = await Promise.allSettled(
-          [...Object.values(providers).map((p) =>
-            p.resolveStream({
-              imdbId: parsed.imdbId,
-              title: meta.name,
-              year: meta.year,
-              type,
-              season: parsed.season,
-              episode: parsed.episode
-            })
-          ), guest.resolveStreams({
-            type, titles: [meta.name], year: meta.year,
-            season: parsed.season, episode: parsed.episode
-          })]
-        );
-        for (const r of results) {
-          if (r.status === 'fulfilled' && Array.isArray(r.value)) streams.push(...r.value);
-        }
+        streams = await providers.kkphim.resolveStream({
+          imdbId: parsed.imdbId, title: meta.name, year: meta.year,
+          type, season: parsed.season, episode: parsed.episode
+        });
       }
     }
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);
   }
-  // Preserve known-good KKphim playback and avoid injecting incompatible K20 headers.
-  // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
-  // directly in Safari without injected headers. Keep this change isolated
-  // to KKphim on this preview branch; all other providers are untouched.
-  streams = dedupe(replaceStreamCEmbeds(streams).map((s) => {
-    if ((s._providerId === 'kkphim' || s._providerId === 'k20') && s.url && /^https:\/\//i.test(s.url)) {
-      if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
+  streams = dedupe(streams.map(stream => {
+    if (stream.url && /^https:\/\//i.test(stream.url) && stream.behaviorHints) {
+      delete stream.behaviorHints.proxyHeaders;
     }
-    return wrapProxy(s, base);
+    return stream;
   }));
   res.json({ streams, cacheMaxAge: 600 });
 });
@@ -281,10 +186,6 @@ async function catalogSend(req, res) {
       return res.json({ metas, cacheMaxAge: 300 });
     } catch (e) { console.warn('[unified:catalog]', e.message); return res.json({ metas: [] }); }
   }
-  if (catalogId.startsWith('vng-')) {
-    const metas = await guest.catalog(type, catalogId.slice(4), req._extra || {});
-    return res.json({ metas, cacheMaxAge: 300 });
-  }
   const dash = catalogId.indexOf('-');
   const providerId = dash > 0 ? catalogId.slice(0, dash) : catalogId;
   const kind = dash > 0 ? catalogId.slice(dash + 1) : '';
@@ -306,10 +207,6 @@ async function catalogSend(req, res) {
 router.get('/meta/:type/:id.json', async (req, res) => {
   const type = req.params.type === 'series' ? 'series' : 'movie';
   const parsed = parseId(req.params.id);
-  if (guest.isRemoteId(req.params.id)) {
-    const meta = await guest.meta(type, guest.unprefix(req.params.id));
-    return meta ? res.json({ meta, cacheMaxAge: 1800 }) : res.status(404).json({ err: 'not found' });
-  }
   if (!parsed) return res.status(404).json({ err: 'not found' });
 
   if (parsed.provider) {

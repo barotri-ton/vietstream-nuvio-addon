@@ -111,7 +111,7 @@ const CONFIG = {
   proxyProviders: csv('PROXY_PROVIDERS', ['nguonc']),
   manifest: {
     id: 'community.barostream',
-    version: process.env.VERSION || '1.1.0',
+    version: process.env.VERSION || '1.2.0',
     name: 'BaroStream · Phim Việt',
     description:
       'BaroStream — nền tảng phim Việt đa nguồn: KKphim, K20, Xem20 (tùy chọn), NguonC, Phim4K, Tophim, VnStream — Vietsub, Lồng tiếng, Thuyết minh. Tương thích Nuvio & Stremio.'
