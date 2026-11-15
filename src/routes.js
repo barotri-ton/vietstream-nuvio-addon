@@ -96,6 +96,32 @@ function dedupe(streams) {
   });
 }
 
+function replaceStreamCEmbeds(streams) {
+  const proxies = new Map();
+  for (const stream of streams) {
+    if (stream._providerId !== 'k20' || !stream.url) continue;
+    try {
+      const url = new URL(stream.url);
+      if (url.pathname !== '/nguonc-hls.m3u8' || url.searchParams.has('mode')) continue;
+      const host = url.searchParams.get('eh');
+      const hash = url.searchParams.get('hash');
+      if (host && hash) proxies.set(`${host}:${hash}`, stream);
+    } catch { /* Ignore malformed stream URLs. */ }
+  }
+  return streams.filter(stream => {
+    if (stream._providerId !== 'nguonc' || !stream.externalUrl) return true;
+    try {
+      const embed = new URL(stream.externalUrl);
+      if (embed.pathname !== '/embed.php') return true;
+      const proxy = proxies.get(`${embed.host}:${embed.searchParams.get('hash')}`);
+      if (!proxy) return true;
+      proxy.name = 'NguonC · K20 Proxy' + stream.name.slice(stream.name.indexOf('\n'));
+      proxy.title = stream.title.replace(/ • Mở bằng trình duyệt$/, '');
+      return false;
+    } catch { return true; }
+  });
+}
+
 // ---------- Routes ----------
 
 router.get('/manifest.json', (req, res) => {
@@ -222,7 +248,7 @@ router.get('/stream/:type/:id.json', async (req, res) => {
   // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
   // directly in Safari without injected headers. Keep this change isolated
   // to KKphim on this preview branch; all other providers are untouched.
-  streams = dedupe(streams.map((s) => {
+  streams = dedupe(replaceStreamCEmbeds(streams).map((s) => {
     if ((s._providerId === 'kkphim' || s._providerId === 'k20') && s.url && /^https:\/\//i.test(s.url)) {
       if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
     }
