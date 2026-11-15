@@ -164,6 +164,10 @@ router.get('/stream/:type/:id.json', async (req, res) => {
     } else if (parsed && parsed.provider) {
       // ID có prefix nguồn (kk_..., nc_...) -> lấy trực tiếp, không cần Cinemeta
       streams = await parsed.provider.streamsFromSlug(parsed.slug, type, parsed.season, parsed.episode);
+      const guestStreams = parsed.provider.detail(parsed.slug).then(d => d ? guest.resolveStreams({
+        type, titles: [d.originalName, d.name], year: d.year,
+        season: parsed.season, episode: parsed.episode
+      }) : []).catch(() => []);
       // Unified catalog maps equivalent provider IDs to one visible title.
       // On a cold serverless instance the registry may be empty; resolve by
       // primary metadata instead of depending solely on in-memory state.
@@ -186,12 +190,13 @@ router.get('/stream/:type/:id.json', async (req, res) => {
           }
         } catch (e) { console.warn('[unified:stream]', e.message); }
       }
+      streams.push(...await guestStreams);
     } else if (parsed) {
       // IMDb ID -> tra tên phim từ Cinemeta rồi hỏi từng nguồn
       const meta = await cinemeta.getMeta(type, parsed.imdbId);
       if (meta) {
         const results = await Promise.allSettled(
-          Object.values(providers).map((p) =>
+          [...Object.values(providers).map((p) =>
             p.resolveStream({
               imdbId: parsed.imdbId,
               title: meta.name,
@@ -200,16 +205,15 @@ router.get('/stream/:type/:id.json', async (req, res) => {
               season: parsed.season,
               episode: parsed.episode
             })
-          )
+          ), guest.resolveStreams({
+            type, titles: [meta.name], year: meta.year,
+            season: parsed.season, episode: parsed.episode
+          })]
         );
         for (const r of results) {
           if (r.status === 'fulfilled' && Array.isArray(r.value)) streams.push(...r.value);
         }
       }
-    }
-    if (parsed && parsed.imdbId) {
-      const remoteStreams = await guest.streams(type, req.params.id);
-      streams.push(...remoteStreams);
     }
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);

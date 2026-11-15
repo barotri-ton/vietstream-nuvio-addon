@@ -1,7 +1,7 @@
 name: Unified Catalog CI
 on:
   push:
-    branches: [feature/unified-catalog-p0]
+    branches: [main, feature/unified-catalog-p0]
   pull_request:
     branches: [main]
 jobs:

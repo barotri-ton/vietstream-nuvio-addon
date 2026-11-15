@@ -96,6 +96,19 @@ test('K20 resolveStream falls back to a year-matched localized search result', a
   assert.equal(streams.length, 1);
 });
 
+test('K20 retains proxy playback and direct streams without a proxy equivalent', async () => {
+  const provider = new K20Provider(cfg);
+  provider.detail = async () => ({ type: 'movie', nativeId: 'nguonc:oppenheimer' });
+  const proxy = 'https://sc.k-20.xyz/nguonc-hls.m3u8?hash=abc&eh=embed.streamc.xyz';
+  const standalone = 'https://sc.k-20.xyz/nguonc-hls.m3u8?hash=def&mode=direct';
+  provider.request = async () => ({
+    streams: [`${proxy}&mode=direct`, proxy, standalone].map(url => ({ url }))
+  });
+
+  const streams = await provider.streamsFromSlug('fixture', 'movie', 1, 1);
+  assert.deepEqual(streams.map(stream => stream.url), [proxy, standalone]);
+});
+
 test('K20 catalog merges and deduplicates provider results', async () => {
   const provider = new K20Provider(cfg);
   provider.fetchCatalog = async (type, catalogId) => {

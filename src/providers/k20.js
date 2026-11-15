@@ -227,9 +227,20 @@ class K20Provider extends BaseProvider {
     const data = await this.request(
       `${this.cfg.apiUrl}/stream/${detail.type}/${encodeURIComponent(nativeVideoId)}.json`
     );
-    return ((data && data.streams) || [])
+    const streams = ((data && data.streams) || [])
       .map((stream) => this.mapStream(stream, detail, episode))
       .filter(Boolean);
+    const urls = new Set(streams.map(stream => stream.url));
+    return streams.filter(stream => {
+      try {
+        const url = new URL(stream.url);
+        if (url.searchParams.get('mode') !== 'direct') return true;
+        url.searchParams.delete('mode');
+        return !urls.has(url.href);
+      } catch {
+        return true;
+      }
+    });
   }
 }
 

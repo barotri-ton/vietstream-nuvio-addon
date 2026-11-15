@@ -1,4 +1,5 @@
 'use strict';
+const { cached, normTitle } = require('./utils');
 // Remote Stremio addon adapter. No scraping or undocumented API required.
 const BASE = (process.env.VNSTREAM_GUEST_URL || 'https://addon.vnstream.io.vn/guest').replace(/\/+$/, '');
 const timeout = Number(process.env.VNSTREAM_GUEST_TIMEOUT || 6500);
@@ -40,4 +41,35 @@ async function meta(type, id) {
   const data = await request('/meta/' + type + '/' + pathId(id) + '.json');
   return data?.meta ? { ...data.meta, id: 'vng_' + data.meta.id, type } : null;
 }
-module.exports = { catalog, streams, meta, isRemoteId, unprefix };
+
+async function resolveStreams({ type, titles, year, season, episode }) {
+  const targetYear = Number.parseInt(year, 10);
+  const queries = [...new Set(titles.filter(Boolean))];
+  if (!targetYear || !queries.length) return [];
+
+  const keys = new Set(queries.map(normTitle).filter(Boolean));
+  const results = await Promise.all(queries.flatMap(title =>
+    ['vietsub', 'voice-over', 'dubbed'].map(audio =>
+      cached(`vng:search:${type}:${audio}:${title}`, 600000,
+        () => catalog(type, `vnstream-${audio}`, { search: title }))
+    )
+  ));
+  const matches = new Map();
+  for (const item of results.flat()) {
+    const names = [item.name, item.originalName, item.original_name,
+      ...String(item.description || '').split(' / ')];
+    if (Number(item.year) === targetYear && names.some(name => keys.has(normTitle(name)))) {
+      matches.set(item.id, item);
+    }
+  }
+  const found = await Promise.all([...matches.values()].slice(0, 3).map(async item => {
+    if (type === 'movie') return streams(type, unprefix(item.id));
+    const detail = await meta(type, unprefix(item.id));
+    const video = detail?.videos?.find(v => Number(v.season) === Number(season || 1) &&
+      Number(v.episode) === Number(episode || 1));
+    return video?.id ? streams(type, video.id) : [];
+  }));
+  return found.flat();
+}
+
+module.exports = { catalog, streams, meta, resolveStreams, isRemoteId, unprefix };
