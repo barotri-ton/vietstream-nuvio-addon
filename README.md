@@ -1,5 +1,16 @@
 # 🎬 VietStream — Addon phim Việt cho Nuvio / Stremio
 
+## 🚀 Cài ngay trên Stremio (bản triển khai của barotri-ton)
+
+**Stremio manifest (production):** https://vietstream-stremio.vercel.app/manifest.json
+
+Mở **Stremio → Addons → Add addon**, dán URL HTTPS ở trên rồi xác nhận cài đặt. **Không** dán URL `raw.githubusercontent.com/.../nuvio-plugin/manifest.json` vì đó là plugin Nuvio, không phải Stremio addon.
+
+Bản triển khai trên Vercel sử dụng các stream trực tiếp, tắt HLS proxy để an toàn và phù hợp giới hạn hosting; một số nguồn yêu cầu header/proxy có thể không phát. Chi tiết: [Triển khai và kiểm tra Vercel](VERCEL_DEPLOY.md).
+
+Fork từ [henryhnguy/vietstream-nuvio-addon](https://github.com/henryhnguy/vietstream-nuvio-addon).
+
+
 Addon tổng hợp luồng xem phim từ các nguồn Việt Nam, hỗ trợ đầy đủ **Vietsub (phụ đề), Lồng tiếng, Thuyết minh**.
 Việt theo giao thức addon chuẩn của Stremio nên cài trực tiếp vào **Nuvio** (Android/iOS) và **Stremio v4/Web**.
 

@@ -2,11 +2,15 @@
 
 This fork exports the Express app from `server.js` for Vercel's native Express deployment. No `vercel.json` rewrite or extra API endpoint is needed.
 
+## Live production URL
+
+**https://vietstream-stremio.vercel.app/manifest.json** (verified HTTP 200 on 2026-11-15; catalog endpoint also returned 20 items during smoke test).
+
 ## Install
 
 1. Import `barotri-ton/vietstream-nuvio-addon` into a Vercel project (Node.js / Express, root directory `.`).
 2. Deploy the default `main` branch. Use a publicly accessible production domain (do not require Vercel login).
-3. Open `https://YOUR_PROJECT.vercel.app/manifest.json` and verify JSON `id`, `resources`, `types` and `catalogs`.
+3. Open `https://vietstream-stremio.vercel.app/manifest.json` and verify JSON `id`, `resources`, `types` and `catalogs`.
 4. Paste this exact HTTPS URL into **Stremio → Addons → Add addon**.
 
 The raw GitHub path `/nuvio-plugin/manifest.json` is **not** a Stremio manifest.

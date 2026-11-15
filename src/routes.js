@@ -135,7 +135,7 @@ router.use('/nuvio-plugin', express.static(PLUGIN_DIR));
 router.get('/', (req, res) => {
   const base = getBaseUrl(req);
   const rows = Object.values(providers)
-    .map((p) => `<li><b>${p.name}</b> <code>${p.cfg.apiUrl}</code>${p.cfg.proxy ? ' (qua proxy)' : ''}</li>`)
+    .map((p) => `<li><b>${p.name}</b> <code>${p.cfg.apiUrl}</code>${shouldProxy(p.id) ? ' (qua proxy)' : ''}</li>`)
     .join('');
   res.type('html').send(
     `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>VietStream Addon</title>
