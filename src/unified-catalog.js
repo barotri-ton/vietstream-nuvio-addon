@@ -1,5 +1,6 @@
 'use strict';
 const { normTitle } = require('./utils');
+const guest = require('./vnstream-guest');
 const { CATALOG_DEFS } = require('./manifest');
 
 const UNIFIED = [
@@ -7,7 +8,9 @@ const UNIFIED = [
   { id: 'unified-series', type: 'series', name: 'Phim bộ · Tổng hợp' },
   { id: 'unified-cinema', type: 'movie', name: 'Phim chiếu rạp · Tổng hợp' },
   { id: 'unified-animation', type: 'series', name: 'Hoạt hình · Tổng hợp' },
-  { id: 'unified-4k', type: 'movie', name: 'Phim 4K · Tổng hợp' }
+  { id: 'unified-4k', type: 'movie', name: 'Phim 4K · Tổng hợp' },
+  { id: 'unified-action', type: 'movie', name: 'Hành động · Tuyển chọn' },
+  { id: 'unified-horror', type: 'movie', name: 'Kinh dị · Tuyển chọn' }
 ];
 const PRIORITY = ['kkphim', 'nguonc', 'vnstream', 'phim4k', 'k20', 'tophim'];
 const registry = new Map();
@@ -69,11 +72,23 @@ function sourceCatalogs(id, providers) {
 }
 async function listUnified(id, type, providers, extra = {}) {
   const sources = sourceCatalogs(id, providers);
+  const guestCatalogs = {
+    'unified-movies': ['vnstream-top', 'vnstream-vietsub', 'vnstream-voice-over'],
+    'unified-series': ['vnstream-top', 'vnstream-vietsub', 'vnstream-voice-over'],
+    'unified-cinema': ['vnstream-top'],
+    'unified-4k': ['vnstream-hd'],
+    'unified-action': ['vnstream-top'],
+    'unified-horror': ['vnstream-top']
+  };
   const results = await Promise.allSettled(sources.map(async ([pid, def]) => {
     const kind = def.id.slice(pid.length + 1);
     return providers[pid].listCatalog(kind, { ...extra, skip: 0 });
   }));
-  const rows = results.flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : []);
+  const guestResults = await Promise.allSettled((guestCatalogs[id] || []).map(kind =>
+    guest.catalog(id === 'unified-series' ? 'series' : kind === 'vnstream-hd' ? 'VNStreamHD' : 'movie', kind,
+      { ...extra, genre: id === 'unified-action' ? 'Hành Động' : id === 'unified-horror' ? 'Kinh Dị' : extra.genre })
+  ));
+  const rows = [...results, ...guestResults].flatMap(r => r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : []);
   const groups = mergeCatalog(rows, type);
   remember(groups);
   const skip = Math.max(0, parseInt(extra.skip, 10) || 0);

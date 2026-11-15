@@ -9,6 +9,7 @@ const { cached, getJson } = require('./utils');
 const { router: hlsRouter, getBaseUrl, b64e } = require('./hls-proxy');
 const { buildManifest, enabledProviders } = require('./manifest');
 const unified = require('./unified-catalog');
+const guest = require('./vnstream-guest');
 
 // ---------- Khởi tạo provider ----------
 const CTORS = {
@@ -158,7 +159,9 @@ router.get('/stream/:type/:id.json', async (req, res) => {
   const base = getBaseUrl(req);
   let streams = [];
   try {
-    if (parsed && parsed.provider) {
+    if (guest.isRemoteId(req.params.id)) {
+      streams = await guest.streams(type, guest.unprefix(req.params.id));
+    } else if (parsed && parsed.provider) {
       // ID có prefix nguồn (kk_..., nc_...) -> lấy trực tiếp, không cần Cinemeta
       streams = await parsed.provider.streamsFromSlug(parsed.slug, type, parsed.season, parsed.episode);
       // Unified catalog maps equivalent provider IDs to one visible title.
@@ -204,14 +207,19 @@ router.get('/stream/:type/:id.json', async (req, res) => {
         }
       }
     }
+    if (parsed && parsed.imdbId) {
+      const remoteStreams = await guest.streams(type, req.params.id);
+      streams.push(...remoteStreams);
+    }
   } catch (e) {
     console.warn('[stream] lỗi:', e.message);
   }
+  // Preserve known-good KKphim playback and avoid injecting incompatible K20 headers.
   // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
   // directly in Safari without injected headers. Keep this change isolated
   // to KKphim on this preview branch; all other providers are untouched.
   streams = dedupe(streams.map((s) => {
-    if (s._providerId === 'kkphim' && s.url && /^https:\/\//i.test(s.url)) {
+    if ((s._providerId === 'kkphim' || s._providerId === 'k20') && s.url && /^https:\/\//i.test(s.url)) {
       if (s.behaviorHints) delete s.behaviorHints.proxyHeaders;
     }
     return wrapProxy(s, base);
@@ -243,6 +251,10 @@ async function catalogSend(req, res) {
       return res.json({ metas, cacheMaxAge: 300 });
     } catch (e) { console.warn('[unified:catalog]', e.message); return res.json({ metas: [] }); }
   }
+  if (catalogId.startsWith('vng-')) {
+    const metas = await guest.catalog(type, catalogId.slice(4), req._extra || {});
+    return res.json({ metas, cacheMaxAge: 300 });
+  }
   const dash = catalogId.indexOf('-');
   const providerId = dash > 0 ? catalogId.slice(0, dash) : catalogId;
   const kind = dash > 0 ? catalogId.slice(dash + 1) : '';
@@ -264,6 +276,10 @@ async function catalogSend(req, res) {
 router.get('/meta/:type/:id.json', async (req, res) => {
   const type = req.params.type === 'series' ? 'series' : 'movie';
   const parsed = parseId(req.params.id);
+  if (guest.isRemoteId(req.params.id)) {
+    const meta = await guest.meta(type, guest.unprefix(req.params.id));
+    return meta ? res.json({ meta, cacheMaxAge: 1800 }) : res.status(404).json({ err: 'not found' });
+  }
   if (!parsed) return res.status(404).json({ err: 'not found' });
 
   if (parsed.provider) {
