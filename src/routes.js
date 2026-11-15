@@ -207,8 +207,12 @@ router.get('/stream/:type/:id.json', async (req, res) => {
         }
       }
     }
+    if (parsed && parsed.imdbId) {
+      const remoteStreams = await guest.streams(type, req.params.id);
+      streams.push(...remoteStreams);
+    }
   } catch (e) {
-    console.warn('[stream] lỗi:', e.message);
+    console.warn('[stream] lỗi:, e.message);
   }
   // Preserve known-good KKphim playback and avoid injecting incompatible K20 headers.
   // Samsung Tizen compatibility experiment: the KKphim HLS URL is playable
